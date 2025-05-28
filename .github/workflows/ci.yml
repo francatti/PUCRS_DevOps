@@ -1,0 +1,38 @@
+name: Meu Primeiro CI Pipeline
+
+# Define quando este workflow será executado
+on:
+  push: # Executa sempre que houver um 'push' para o repositório
+    branches:
+      - main
+  pull_request: # Executa sempre que houver um 'pull request'
+    branches:
+      - main
+
+# Define os "jobs" (tarefas) que o pipeline vai executar
+jobs:
+  build: # Nome do seu job
+    runs-on: ubuntu-latest
+    steps:
+      # Passo 1: Faz o checkout do código do seu repositório
+      - name: Checkout do Código
+        uses: actions/checkout@v4
+
+      # Passo 2: Configura o ambiente Node.js
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "npm" # Habilita o cache de dependências do npm para acelerar builds futuros
+
+      # Passo 3: Instala as dependências do projeto
+      - name: Instalar Dependências
+        run: npm install
+
+      # 4. Rodar os testes da aplicação
+      - name: Run tests
+        run: npm test
+
+      # 5. Build da aplicação
+      - name: Build the application
+        run: npm run build

@@ -1,5 +1,17 @@
 {
   "dependencies": {
     "express": "^5.1.0"
-  }
+  },
+  "name": "my-node-hello-world-app",
+  "version": "1.0.0",
+  "description": "Hello World - Projeto DevOps PUCRS",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Teste OK\"",
+    "build": "npm install && echo \"Build completed\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }
