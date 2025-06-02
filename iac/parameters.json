@@ -1,0 +1,14 @@
+[
+  {
+    "ParameterKey": "KeyPairName",
+    "ParameterValue": "chavesPUCRS"
+  },
+  {
+    "ParameterKey": "InstanceType",
+    "ParameterValue": "t2.micro" 
+  },
+  {
+    "ParameterKey": "AMIId",
+    "ParameterValue": "ami-0953476d60561c955"
+  }
+]
