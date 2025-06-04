@@ -1,0 +1,103 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Template CloudFormation para IAC do projeto de DevOps da PUCRS - Instancia EC2 com Node.js e GitHub"
+
+Parameters:
+  KeyPairName:
+    Type: String
+    Description: "Name of an existing EC2 KeyPair to enable SSH access to the instance."
+  InstanceType:
+    Type: String
+    Description: "EC2 instance type for the web server."
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - t3.micro
+      - t2.small
+      - t3.small
+  AMIId:
+    Type: AWS::EC2::Image::Id # Define que o tipo é um ID de AMI (Imagem da Máquina da Amazon)
+    Description: "ID of the Amazon Machine Image (AMI) for the web server instance."
+    # Você precisará encontrar o ID de uma AMI Linux para a sua região (ex: Amazon Linux 2 ou 2023)
+    # Ex: para us-east-1, pode ser algo como ami-0abcdef1234567890 (você precisará consultar o EC2 console)
+    # Recomendo usar a AMI do Amazon Linux 2023 ou Amazon Linux 2.
+    # DICA: Acesse o console do EC2, clique em "Launch Instance", e copie o AMI ID da imagem que você quer usar.
+    ConstraintDescription: "Must be a valid AMI ID for your region."
+
+Resources:
+  # Security Group para permitir SSH e tráfego HTTP
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: WebServerSecurityGroup
+      GroupDescription: Enable SSH and HTTP access to the web server
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0 # Permitir SSH de qualquer IP (CUIDADO EM PRODUÇÃO!)
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0 # Permitir HTTP de qualquer IP
+
+  # Instância EC2
+  WebServerInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref AMIId
+      KeyName: !Ref KeyPairName
+      SecurityGroupIds:
+        - !Ref WebServerSecurityGroup
+      Tags:
+        - Key: Name
+          Value: projetoPUCRS_DevOps
+      UserData: !Base64 | 
+        #!/bin/bash
+        # Script de UserData para configurar a instância EC2 para Node.js
+
+        # 1. Atualizar o sistema operacional
+        sudo yum update -y
+
+        # 2. Instalar Node.js e NPM
+        # Para Amazon Linux 2023, o comando é 'dnf', mas 'yum' geralmente funciona para compatibilidade.
+        # Se a sua AMI for Amazon Linux 2, 'yum' é o correto.
+        # Verifique a documentação da sua AMI se tiver problemas.
+        echo "Instalando Node.js e NPM..."
+        curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+        sudo yum install -y nodejs
+
+        # 3. Criar diretório para a aplicação e navegar até ele
+        APP_DIR="/home/ec2-user/my-node-app"
+        sudo mkdir -p $APP_DIR
+        sudo chown ec2-user:ec2-user $APP_DIR
+        cd $APP_DIR
+
+        # 4. Instalar Git
+        echo "Instalando Git..."
+        sudo yum install -y git
+
+        # 5. Clonar o repositório do GitHub
+        echo "Clonando o repositório do GitHub..."
+        git clone https://github.com/francatti/PUCRS_DevOps .
+
+        # 6. Instalar dependências do Node.js
+        echo "Instalando dependências do Node.js..."
+        npm install
+
+        # 7. Iniciar a aplicação Node.js
+        echo "Iniciando a aplicação Node.js..."
+        nohup node server.js > app.log 2>&1 &
+
+        echo "Configuração da instância concluída!"
+
+Outputs:
+  InstanceId:
+    Description: "ID da Instancia EC2 criada."
+    Value: !Ref WebServerInstance
+  PublicIp:
+    Description: "Endereço IP Publico da Instancia EC2."
+    Value: !GetAtt WebServerInstance.PublicIp
+  PublicDnsName:
+    Description: "Nome DNS Publico da Instancia EC2."
+    Value: !GetAtt WebServerInstance.PublicDnsName
