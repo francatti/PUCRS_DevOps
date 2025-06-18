@@ -1,0 +1,105 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS CloudFormation Template para o projeto DevOPS na Prática.
+
+# --- Parâmetros ---
+Parameters:
+  VpcId:
+    Type: String
+    Description: ID de uma VPC na qual o cluster ECS vai ser rodar.
+  PublicSubnetIds:
+    Type: CommaDelimitedList
+    Description: Uma lista separada por vírgula de IDs de subnets públicas (ao menos 2) para as tasks do ECS.
+  ContainerImage:
+    Type: String
+    Description: URI da imagem Docker da aplicação.
+
+# --- Recursos ---
+Resources:
+  # IAM Role para que as tarefas ECS possam puxar imagens e enviar logs
+  ECSTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: DevOpsECSTaskExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy # Permissões para execução de tarefas ECS
+
+  # Security Group para o container
+  HelloWorldSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: DevOpsECSSecurityGroup
+      GroupDescription: Security Group para as tasks do ECS.
+      VpcId: !Ref VpcId 
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80 
+          ToPort: 80
+          CidrIp: 0.0.0.0/0 
+      Tags:
+        - Key: Name
+          Value: DevOpsECSSG
+
+  # Cluster ECS
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: cluster-devops
+
+  # Definição da Tarefa ECS (Task Definition)
+  HelloWorldTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: devops-cf-app 
+      Cpu: '256' # 0.25 vCPU
+      Memory: '512' # 512 MiB
+      NetworkMode: awsvpc # Modo de rede Fargate
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn # Role de execução pra tarefa
+      ContainerDefinitions:
+        - Name: devops-container
+          Image: !Ref ContainerImage
+          PortMappings:
+            - ContainerPort: 80
+              Protocol: tcp
+          LogConfiguration: # Envia logs para o CloudWatch
+            LogDriver: awslogs
+            Options:
+              awslogs-group: /ecs/hello-world-cf-app 
+              awslogs-region: !Ref "AWS::Region" 
+              awslogs-stream-prefix: ecs
+
+  # Serviço ECS
+  HelloWorldService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref ECSCluster
+      ServiceName: hello-world-cf-service
+      TaskDefinition: !Ref HelloWorldTaskDefinition
+      DesiredCount: 1 
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets: !Ref PublicSubnetIds
+          SecurityGroups:
+            - !GetAtt HelloWorldSecurityGroup.GroupId 
+          AssignPublicIp: ENABLED
+
+# --- Saídas ---
+Outputs:
+  ECSClusterName:
+    Description: Nome do Cluster ECS criado
+    Value: !Ref ECSCluster
+  ECSServiceName:
+    Description: Nome do Serviço ECS criado
+    Value: !Ref ECSService
+  HelloWorldServiceURL:
+    Description: URL para acessar o serviço DevOps
+    Value: !Join ['', ['http://', {'Fn::GetAtt': ['ECSService', 'NetworkConfiguration.AwsvpcConfiguration.PublicIp']}]]
